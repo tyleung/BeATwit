@@ -16,6 +16,8 @@ host_player = ""
 player_list = []
 
 class TweetListener(tweepy.StreamListener):
+	join_str = "join game " + str(game_id)
+	
 	def on_data(self, data):
 		# Twitter returns data in JSON format - we need to decode it first
 		decoded = json.loads(data)
@@ -26,25 +28,35 @@ class TweetListener(tweepy.StreamListener):
 		
 		# Strip the "@450bot " beginning of the tweet
 		text = text[len(filter_track) + 1:]
-		if text == "join":
-			player = Player(user)
-			if len(player_list) == 0:
-				self.new_game()
-				host_player = player
-			player_list.append(player)
-			print(player.get_screen_name(), "has joined the game.")
+		if text == "create" and len(player_list) == 0:
+			self.new_game()
+			self.join_game(user)
+			host_player = user
+		elif text == join_str:
+			self.join_game(user)
 		
 		return True
     
 	def on_error(self, status):
 		print status
 		
+	def join_game(self, user):
+		player = Player(user)
+		for p in player_list:
+			if p.screen_name == player.screen_name:
+				print(player.screen_name + " has already joined the game.")
+				return
+		player_list.append(player)
+		print(player.screen_name + " has joined the game.")
+	
 	def new_game(self):
 		# Tweet the game id to get around the duplicate status error.
 		game_id = DataManager.get_last_game_id()
 		game_id += 1
 		DataManager.save_game_id(game_id)
-		api.update_status("(Game #" + str(game_id) + ") A new game has been created. Tweet '@450bot join' to join the game.")
+		global join_str
+		join_str = "join game " + str(game_id)
+		api.update_status("(Game #" + str(game_id) + ") A new game has been created. Tweet '@450bot " + join_str + "' to join the game.")
 	
 def main():
 	l = TweetListener()

@@ -1,6 +1,6 @@
 import json
 import tweepy
-import time
+from datamanager import DataManager
 from player import Player
 
 CONSUMER_KEY = "bBt8taxLy06yKaW0xUtvOjLWx"
@@ -11,8 +11,9 @@ auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
 auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
 api = tweepy.API(auth, parser=tweepy.parsers.JSONParser())
 filter_track = '@450bot'
-player_list = []
+game_id = 0
 host_player = ""
+player_list = []
 
 class TweetListener(tweepy.StreamListener):
 	def on_data(self, data):
@@ -28,6 +29,7 @@ class TweetListener(tweepy.StreamListener):
 		if text == "join":
 			player = Player(user)
 			if len(player_list) == 0:
+				self.new_game()
 				host_player = player
 			player_list.append(player)
 			print(player.get_screen_name(), "has joined the game.")
@@ -36,6 +38,13 @@ class TweetListener(tweepy.StreamListener):
     
 	def on_error(self, status):
 		print status
+		
+	def new_game(self):
+		# Tweet the game id to get around the duplicate status error.
+		game_id = DataManager.get_last_game_id()
+		game_id += 1
+		DataManager.save_game_id(game_id)
+		api.update_status("(Game #" + str(game_id) + ") A new game has been created. Tweet '@450bot join' to join the game.")
 	
 def main():
 	l = TweetListener()

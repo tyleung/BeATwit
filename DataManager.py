@@ -1,50 +1,28 @@
-import mmap
-import os.path
+game_id_file = "gameid.txt"
+
 class DataManager:
-    """This class helps keeping all the ids saved in a txt file"""
-    def __init__(self, fileName):
-        
-        self.fileName = fileName
-        if os.path.isfile(self.fileName) == False:
-            file = open(self.fileName, 'w')
-            file.write("*_INI FILE_*\n")
-            file.close()
-    def is_stored_b(self, id_string):
-        Found = False
-        if os.path.isfile(self.fileName) == False:
-            return Found
-        with open(self.fileName, 'rb', 0) as file, \
-             mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ) as s:
-            if s.find(bytes(id_string, 'UTF-8')) != -1:
-                Found = True
-        return Found
-    def is_stored(self, id_string):
-        Found = False
-        if os.path.isfile(self.fileName) == False:
-            return Found
-        if id_string in open(self.fileName).read():
-            Found = True
-        return Found;
-    def add_data(self, id_string):
-        if os.path.isfile(self.fileName) == False:
-            file = open(self.fileName, 'w')
-        else:
-            file = open(self.fileName, 'a')
-        if not self.is_stored_b(id_string):
-            file.write(id_string + "\n")
-            file.close()
-        return
-    def remove_data(self, id_string):
-        if os.path.isfile(self.fileName) == True:
-            file = open(self.fileName,"r")
-            fileData = f.readlines()
-            file.close()
-            file = open(self.fileName,"w")
-            for line in fileData:
-                if line!=id_string+"\n":
-                    f.write(line)
-            file.close()
-        return
-    def Set_fileName(self, name):
-        self.fileName = name
-        return
+	"""This class helps keeping all the ids saved in a txt file"""
+	
+	@staticmethod
+	def save_game_id(id):
+		"""Save current game ID to a file"""
+		last_id = DataManager.get_last_game_id()
+
+		if last_id < id:
+			f = open(game_id_file, 'w')
+			f.write(str(id)) # no trailing newline
+			f.close()
+		else:
+			print('Received smaller ID, not saving. Old: %d, New: %s' % (last_id, id))
+
+	@staticmethod
+	def get_last_game_id():
+		"""Retrieve last game ID from a file"""
+		try:
+			f = open(game_id_file, 'r')
+			id = int(f.read())
+			f.close()
+		except IOError:
+			print('IOError raised, returning zero (0)')
+			return 0
+		return id

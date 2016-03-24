@@ -8,5 +8,6 @@ class Player:
 		self.id = str(user['id'])
 		self.name = str(user['name'])
 		self.screen_name = str(user['screen_name'])
-		self.move = None
+		self.move = 0
 		self.qi = 0
+		self.reply = 0

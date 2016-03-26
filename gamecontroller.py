@@ -1,5 +1,6 @@
 class GameController:
 	
+	@staticmethod
 	def get_player(user, player_list):
 		"""Gets the player object from the player list given the user."""
 		for p in player_list:
@@ -7,6 +8,7 @@ class GameController:
 				return p
 		return None
 	
+	@staticmethod
 	def user_exists(user, player_list):
 		"""Returns true if the user exists in the player list."""
 		return any(p.id == str(user['id']) for p in player_list)

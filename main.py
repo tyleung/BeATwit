@@ -1,7 +1,7 @@
 import json
 import tweepy
-import gamecontroller as gc
 from datamanager import DataManager
+from gamecontroller import GameController as gc
 from player import Player
 
 CONSUMER_KEY = "bBt8taxLy06yKaW0xUtvOjLWx"
@@ -11,56 +11,21 @@ ACCESS_TOKEN_SECRET = "z6avibQB5JwFVPa4xyTr0lUs56XkxwmzVgS43CS3b3e2L"
 auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
 auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
 api = tweepy.API(auth, parser=tweepy.parsers.JSONParser())
-filter_track = '@450bot'
+
 game_id = 0
-host_player = ""
+host_player = Player()
+move_list = {"shoot": 0, "reload": 1, "defend": 2, "bang": 3}
 player_list = []
 game = None
 
 class TweetListener(tweepy.StreamListener):
-	join_str = "join game " + str(game_id)
-
-	"""
-	def on_data(self, data):
-		global host_player
-		global game
+	
+	def __init__(self):
+		super(TweetListener, self).__init__()
+		self.game_created = False
 		
-		# Twitter returns data in JSON format - we need to decode it first
-		decoded = json.loads(data)
-		print(decoded)
-		
-		# Also, we convert UTF-8 to ASCII ignoring all bad characters sent by users
-		user = decoded['user']
-		text = decoded['text'].encode('ascii', 'ignore')
-		player = None
-		#try to find the player in the player_list
-		if gc.user_exists(user, player_list):
-			player = gc.get_player(user, player_list)
-		else:
-			player = Player(user)
-		
-		# Strip the "@450bot " beginning of the tweet
-		text = text[len(filter_track) + 1:]
-		if text == "create" and len(player_list) == 0:
-			self.new_game()
-			self.join_game(player)
-			host_player = player.screen_name
-			print(player.screen_name)
-		elif text == join_str:
-			self.join_game(player)
-		elif text == "start":
-			if player.screen_name == host_player:
-				game = playGame()
-				game_id = DataManager.get_last_game_id()
-				api.update_status( "(Game #" + str(game_id) + ") @" + player.screen_name + " you started the game, make your first move!")
-			else:
-				api.update_status("@" + player.screen_name + "you are not allowed to start this game")
-		elif text == "shoot" or text == "reload" or text =="defend" or text == "Bang":
-			game.get_reply(player,text)
-				
- 
-		return True
-   """
+	#def on_data(self, data):
+	#	return True
 	
 	def on_direct_message(self, status):
 		"""Called when a direct message is received.
@@ -80,16 +45,43 @@ class TweetListener(tweepy.StreamListener):
 			recipient
 			id
 		"""
+		global host_player
 		dm = status._json['direct_message']
 		sender = dm['sender']
-		print(sender['screen_name'])
-		print(dm['text'])
+		text = dm['text'].encode('ascii', 'ignore').lower()
+		
+		player = None
+		if gc.user_exists(sender, player_list):
+			player = gc.get_player(sender, player_list)
+		else:
+			player = Player(sender)
+		
+		if not self.game_created:
+			if text == "create" and len(player_list) == 0:
+				self.new_game()
+				self.join_game(player)
+				host_player = player
+				api.send_direct_message(user=player.id, text="You are the host player. Send 'start' to start the game when everyone has joined.")
+				self.game_created = True
+		else:
+			if text == "join":
+				self.join_game(player)
+			elif text == "start":
+				if player == host_player:
+					s = "(Game #" + str(game_id) + ") The game has started. Available actions: 'shoot', 'reload', 'defend', 'bang'"
+					print(s)
+					api.update_status(s)
+					game = PlayGame()
+				else:
+					api.send_direct_message(user=player.id, text="Only the host player can start the game.")
+			elif text in move_list.keys():
+				game.get_reply(player,text)
 	
 	def on_error(self, status):
 		print status
 		
-		
 	def join_game(self, player):
+		"""Join the game. Adds the given player to the player list."""
 		if player in player_list:
 			print(player.screen_name + " has already joined the game.")
 		else:
@@ -97,17 +89,14 @@ class TweetListener(tweepy.StreamListener):
 			print(player.screen_name + " has joined the game.")
 	
 	def new_game(self):
-		# Tweet the game id to get around the duplicate status error.
+		"""Starts a new game."""
+		global game_id
 		game_id = DataManager.get_last_game_id()
 		game_id += 1
-		DataManager.save_game_id(game_id)
-		global join_str
-		join_str = "join game " + str(game_id)
-		api.update_status("(Game #" + str(game_id) + ") A new game has been created. Tweet '@450bot " + join_str + "' to join the game.")
+		DataManager.save_game_id(game_id)		
+		api.update_status( "(Game #" + str(game_id) + ") A new game has been created. Send a direct message 'join' to join the game.")
 		
-		
-		
-class playGame:
+class PlayGame:
 	global player_list
 	def __init__(self):
 		self.player_num = len(player_list)
@@ -191,7 +180,6 @@ class playGame:
 def main():
 	l = TweetListener()
 	stream = tweepy.Stream(auth=api.auth, listener=l)
-	#stream.filter(track=[filter_track])
 	stream.userstream()
 		
 if __name__=="__main__":

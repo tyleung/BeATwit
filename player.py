@@ -11,7 +11,7 @@ class Player:
 		self.reply = 0
 		
 	def __eq__(self, other):
-		return self.__dict__ == other.__dict__
+		return self.id == other.id
 		
 	def __repr__(self):
 		return str(self.__dict__)

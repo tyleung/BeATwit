@@ -16,13 +16,13 @@ game_id = 0
 host_player = Player()
 move_list = {"shoot": 0, "reload": 1, "defend": 2, "bang": 3}
 player_list = []
-game = None
 
 class TweetListener(tweepy.StreamListener):
 	
 	def __init__(self):
 		super(TweetListener, self).__init__()
 		self.game_created = False
+		self.game = None
 		
 	#def on_data(self, data):
 	#	return True
@@ -61,7 +61,7 @@ class TweetListener(tweepy.StreamListener):
 				self.new_game()
 				self.join_game(player)
 				host_player = player
-				api.send_direct_message(user=player.id, text="You are the host player. Send 'start' to start the game when everyone has joined.")
+				#api.send_direct_message(user=player.id, text="You are the host player. Send 'start' to start the game when everyone has joined.")
 				self.game_created = True
 		else:
 			if text == "join":
@@ -70,12 +70,13 @@ class TweetListener(tweepy.StreamListener):
 				if player == host_player:
 					s = "(Game #" + str(game_id) + ") The game has started. Available actions: 'shoot', 'reload', 'defend', 'bang'"
 					print(s)
-					api.update_status(s)
-					game = PlayGame()
+					#api.update_status(s)
+					self.game = PlayGame()
 				else:
-					api.send_direct_message(user=player.id, text="Only the host player can start the game.")
+					pass
+					#api.send_direct_message(user=player.id, text="Only the host player can start the game.")
 			elif text in move_list.keys():
-				game.get_reply(player,text)
+				self.game.get_reply(player, text)
 	
 	def on_error(self, status):
 		print status
@@ -93,8 +94,10 @@ class TweetListener(tweepy.StreamListener):
 		global game_id
 		game_id = DataManager.get_last_game_id()
 		game_id += 1
-		DataManager.save_game_id(game_id)		
-		api.update_status( "(Game #" + str(game_id) + ") A new game has been created. Send a direct message 'join' to join the game.")
+		DataManager.save_game_id(game_id)
+		m = "(Game #" + str(game_id) + ") A new game has been created. Send a direct message 'join' to join the game."
+		#api.update_status(m)
+		print(m)
 		
 class PlayGame:
 	global player_list
@@ -102,62 +105,71 @@ class PlayGame:
 		self.player_num = len(player_list)
 		self.count_reply = 0
 		self.gameover_list =[]
+
 	def get_reply(self,who,reply):
-		print(who)
-		print(player_list.index(who))
+		#print(player_list)
 		self.count_reply+=1
 		#check if the player replied
-		player_list[player_list.index(who)].reply = 1
+		idx = [p.id for p in player_list].index(who.id)
+		player_list[idx].reply = 1
+		print("check if player replied")
 		#0:reload, 1:shoot,2:defend,3:bang
 		
 		
 		if reply == "shoot":
-			if player_list[player_list.index(who)].qi == 0:
+			if player_list[idx].qi == 0:
 				#send direct msg here. by default set to reload.
-				player_list[player_list.index(who)].move = 0
+				player_list[idx].move = 0
 			else:
-				player_list[player_list.index(who)].move = 1
+				player_list[idx].move = 1
 		elif reply == "reload":
-			player_list[player_list.index(who)].move = 0
-			player_list[player_list.index(who)].qi += 1
+			player_list[idx].move = 0
+			player_list[idx].qi += 1
 		elif reply == "defend":
-			player_list[player_list.index(who)].move = 2
+			player_list[idx].move = 2
 		elif reply == "Bang":
-			player_list[player_list.index(who)].move = 3
-		
+			player_list[idx].move = 3
+
 		if self.count_reply == self.player_num:
 			result = self.get_result()
 		
 		
 	def get_result(self):
+		print(player_list)
+		global game_id
 		#the attack 
 		for player in player_list:
 			#Bang attack. Undefendable
 			if player.move == 3:
 				for player2 in player_list:
 					if player2.move != 3:
-						self.gameover_list.append(player)
+						self.gameover_list.append(player2)
 				sn = player.screen_name
-				m = "@%s Wow! looks like you killed somebody. Nice move!"%(sn)
-				api.update_status(m,player.id)
+				m =  "(Game #" + str(game_id) + ") @%s Wow! looks like you killed somebody. Nice move!"%(sn)
+				#api.send_direct_message(user=player.id ,text=m)
+				print(m)
 			#normal attack, defendable
 
 			elif player.move == 1:
 				for player2 in player_list:
 					if player2.move == 0:
-						self.gameover_list.append(player)
+						self.gameover_list.append(player2)
 				sn = player.screen_name
-				m = "@%s Wow! looks like you killed somebody. Nice move!"%(sn)
-				api.update_status(m,player.id)
+				m =  "(Game #" + str(game_id) + ") @%s Wow! looks like you killed somebody. Nice move!"%(sn)
+				#api.send_direct_message(user=player.id ,text=m)
+				print(m)
 		#nobody attack, then everyone is safe
+		print(self.gameover_list)
 		if self.gameover_list ==[]:
-			m = "looks like everyone is safe this round! What about your next move?"
-			api.update_status(m)
+			m = "(Game #" + str(game_id) + ") Looks like everyone is safe this round! What about your next move?"
+			#api.send_direct_message(user=player.id ,text=m)
+			print(m)
 		#send msg to the dead men	
 		for player in self.gameover_list:
 			sn = player.screen_name
-			m = "@%s I'm sorry,you've eliminated in this round..."%(sn)
-			api.update_status(m,player.id)
+			m =  "(Game #" + str(game_id) + ") @%s I'm sorry,you've eliminated in this round..."%(sn)
+			#api.send_direct_message(user=player.id ,text=m)
+			print(m)
 			player_list.remove(player)
 		#reset the moves to reload
 		for player in player_list:
@@ -172,8 +184,9 @@ class PlayGame:
 		if len(player_list) == 1:
 			player = player_list[0]
 			sn = player.screen_name
-			m = "@%s Nicely done! You are the winner of this round!"%(sn)
-			api.update_status(m,player.id)
+			m =  "(Game #" + str(game_id) + ") @%s Nicely done! You are the winner of this game!"%(sn)
+			#api.update_status(m,player.id)
+			print(m)
 			
 	
 	
